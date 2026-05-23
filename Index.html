@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nova Wealth OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+            },
+          },
+        },
+      };
+    </script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100">
+    <div class="relative overflow-hidden">
+      <div
+        class="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.15),transparent_55%)]"
+      ></div>
+      <div class="relative z-10 px-6 py-8 md:px-10 lg:px-14">
+        <header class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p class="text-sm uppercase tracking-[0.3em] text-slate-400">Nova Wealth OS</p>
+            <h1 class="text-3xl font-semibold text-white">Quantitative Wealth Cockpit</h1>
+            <p class="mt-2 max-w-2xl text-sm text-slate-400">
+              Systematic execution based on probability and data. Expected value overrides
+              emotion.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <button
+              class="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium backdrop-blur"
+              onclick="openGoalModal()"
+            >
+              Change Goal
+            </button>
+            <button
+              class="rounded-full bg-blue-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30"
+              onclick="openFlowModal()"
+            >
+              + Log Flow
+            </button>
+          </div>
+        </header>
+
+        <section class="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div class="glass-card">
+            <p class="metric-label">Current Capital</p>
+            <p class="metric-value" id="currentCapital">$0</p>
+          </div>
+          <div class="glass-card">
+            <p class="metric-label">Target Capital</p>
+            <p class="metric-value" id="targetCapital">$0</p>
+          </div>
+          <div class="glass-card">
+            <p class="metric-label">Daily Safety Limit</p>
+            <p class="metric-value" id="dailyLimit">$0</p>
+          </div>
+          <div class="glass-card">
+            <p class="metric-label">Days Remaining</p>
+            <p class="metric-value" id="daysRemaining">0</p>
+          </div>
+        </section>
+
+        <section class="mt-8">
+          <div class="flex flex-wrap gap-3 rounded-full bg-white/5 p-1 text-sm font-medium">
+            <button class="tab-button active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-button" data-tab="budget">Budget Matrix</button>
+            <button class="tab-button" data-tab="reports">Strategy Reports</button>
+          </div>
+
+          <div class="mt-6 space-y-6">
+            <div id="tab-dashboard" class="tab-panel">
+              <div class="grid gap-6 lg:grid-cols-3">
+                <div class="glass-card lg:col-span-2">
+                  <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-semibold">Capital Trajectory</h2>
+                    <span class="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      Balance Series
+                    </span>
+                  </div>
+                  <div class="mt-4 h-64">
+                    <canvas id="capitalChart"></canvas>
+                  </div>
+                </div>
+                <div class="glass-card">
+                  <h2 class="text-lg font-semibold">Budget Allocation</h2>
+                  <p class="text-sm text-slate-400">Planned allocations by category.</p>
+                  <div class="mt-4 h-64">
+                    <canvas id="budgetChart"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <div class="glass-card mt-6">
+                <div class="flex items-center justify-between">
+                  <h2 class="text-lg font-semibold">Recent Flows</h2>
+                  <span class="text-xs text-slate-400">Auto-flagged by Medallion Protocol</span>
+                </div>
+                <div class="mt-4 overflow-x-auto">
+                  <table class="w-full text-left text-sm">
+                    <thead class="text-xs uppercase text-slate-400">
+                      <tr>
+                        <th class="py-2">Date</th>
+                        <th class="py-2">Type</th>
+                        <th class="py-2">Amount</th>
+                        <th class="py-2">Note</th>
+                        <th class="py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="transactionsTable"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-budget" class="tab-panel hidden">
+              <div class="glass-card">
+                <h2 class="text-lg font-semibold">Budget Matrix</h2>
+                <p class="text-sm text-slate-400">
+                  Planned versus actual deployment across categories.
+                </p>
+                <div class="mt-4 overflow-x-auto">
+                  <table class="w-full text-left text-sm">
+                    <thead class="text-xs uppercase text-slate-400">
+                      <tr>
+                        <th class="py-2">Category</th>
+                        <th class="py-2">Planned</th>
+                        <th class="py-2">Actual</th>
+                      </tr>
+                    </thead>
+                    <tbody id="budgetTable"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div id="tab-reports" class="tab-panel hidden">
+              <div class="grid gap-6 lg:grid-cols-3">
+                <div class="glass-card lg:col-span-2">
+                  <h2 class="text-lg font-semibold">Multi-Agent Debate Engine</h2>
+                  <p class="text-sm text-slate-400">
+                    Gemini proposes. Groq critiques. Gemini synthesizes. All outputs are
+                    probabilistic and EV-driven.
+                  </p>
+                  <div class="mt-4 space-y-4">
+                    <textarea
+                      id="debateInput"
+                      rows="4"
+                      class="w-full rounded-2xl border border-white/10 bg-slate-900/60 p-4 text-sm text-slate-100 focus:border-blue-400 focus:outline-none"
+                      placeholder="Insert your tactical question or macro thesis."
+                    ></textarea>
+                    <button
+                      class="rounded-full bg-blue-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30"
+                      onclick="runDebate()"
+                    >
+                      Run Debate
+                    </button>
+                    <div id="debateStatus" class="text-xs text-slate-400"></div>
+                  </div>
+                </div>
+                <div class="glass-card">
+                  <h2 class="text-lg font-semibold">Recent Directives</h2>
+                  <p class="text-sm text-slate-400">Stored synthesis outputs.</p>
+                  <div id="reportList" class="mt-4 space-y-4 text-sm"></div>
+                </div>
+              </div>
+              <div class="glass-card mt-6">
+                <div class="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Proposer</p>
+                    <div id="proposerOutput" class="mt-2 whitespace-pre-line text-sm"></div>
+                  </div>
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Critic</p>
+                    <div id="criticOutput" class="mt-2 whitespace-pre-line text-sm"></div>
+                  </div>
+                  <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-400">Synthesizer</p>
+                    <div id="synthOutput" class="mt-2 whitespace-pre-line text-sm"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="flowModal" class="modal hidden">
+      <div class="modal-card">
+        <h3 class="text-lg font-semibold">Log Flow</h3>
+        <form id="flowForm" class="mt-4 space-y-3">
+          <input type="date" id="flowDate" class="input" />
+          <select id="flowType" class="input">
+            <option value="INFLOW">Inflow</option>
+            <option value="OUTFLOW">Outflow</option>
+          </select>
+          <input type="number" id="flowAmount" class="input" placeholder="Amount" step="0.01" />
+          <input type="text" id="flowNote" class="input" placeholder="Note" />
+          <div class="flex justify-end gap-2">
+            <button type="button" class="button-secondary" onclick="closeFlowModal()">
+              Cancel
+            </button>
+            <button type="submit" class="button-primary">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="goalModal" class="modal hidden">
+      <div class="modal-card">
+        <h3 class="text-lg font-semibold">Change Goal</h3>
+        <form id="goalForm" class="mt-4 space-y-3">
+          <input type="number" id="goalTarget" class="input" placeholder="Target Capital" />
+          <input type="number" id="goalDays" class="input" placeholder="Days Remaining" />
+          <div class="flex justify-end gap-2">
+            <button type="button" class="button-secondary" onclick="closeGoalModal()">
+              Cancel
+            </button>
+            <button type="submit" class="button-primary">Update</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <style>
+      .glass-card {
+        border-radius: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1.25rem;
+        box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.5);
+        backdrop-filter: blur(18px);
+      }
+      .metric-label {
+        font-size: 0.7rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #94a3b8;
+      }
+      .metric-value {
+        margin-top: 0.5rem;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #ffffff;
+      }
+      .tab-button {
+        border-radius: 9999px;
+        padding: 0.5rem 1rem;
+        color: #cbd5f5;
+        transition: all 0.2s ease;
+      }
+      .tab-button.active {
+        background: #3b82f6;
+        color: #ffffff;
+        box-shadow: 0 20px 40px -20px rgba(59, 130, 246, 0.6);
+      }
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 1rem;
+      }
+      .modal-card {
+        width: 100%;
+        max-width: 28rem;
+        border-radius: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(2, 6, 23, 0.9);
+        padding: 1.5rem;
+        box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(16px);
+      }
+      .input {
+        width: 100%;
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(15, 23, 42, 0.7);
+        padding: 0.55rem 1rem;
+        font-size: 0.875rem;
+        color: #e2e8f0;
+      }
+      .input:focus {
+        outline: none;
+        border-color: rgba(59, 130, 246, 0.8);
+      }
+      .button-primary {
+        border-radius: 9999px;
+        background: #3b82f6;
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #ffffff;
+        box-shadow: 0 20px 40px -20px rgba(59, 130, 246, 0.6);
+      }
+      .button-secondary {
+        border-radius: 9999px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+        color: #e2e8f0;
+      }
+    </style>
+
+    <script>
+      const state = { data: null, charts: {} };
+      const currency = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+      });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        setupTabs();
+        setupForms();
+        loadData();
+      });
+
+      function setupTabs() {
+        document.querySelectorAll('.tab-button').forEach((button) => {
+          button.addEventListener('click', () => {
+            document.querySelectorAll('.tab-button').forEach((btn) => btn.classList.remove('active'));
+            button.classList.add('active');
+            const target = button.dataset.tab;
+            document.querySelectorAll('.tab-panel').forEach((panel) => {
+              panel.classList.toggle('hidden', panel.id !== `tab-${target}`);
+            });
+          });
+        });
+      }
+
+      function setupForms() {
+        const flowForm = document.getElementById('flowForm');
+        flowForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          const payload = {
+            date: document.getElementById('flowDate').value,
+            type: document.getElementById('flowType').value,
+            amount: document.getElementById('flowAmount').value,
+            note: document.getElementById('flowNote').value,
+          };
+          google.script.run
+            .withSuccessHandler(renderAppData)
+            .withFailureHandler(handleError)
+            .logFlow(payload);
+          closeFlowModal();
+          flowForm.reset();
+        });
+
+        const goalForm = document.getElementById('goalForm');
+        goalForm.addEventListener('submit', (event) => {
+          event.preventDefault();
+          const target = document.getElementById('goalTarget').value;
+          const days = document.getElementById('goalDays').value;
+          google.script.run
+            .withSuccessHandler(renderAppData)
+            .withFailureHandler(handleError)
+            .updateGoal(target, days);
+          closeGoalModal();
+        });
+      }
+
+      function loadData() {
+        google.script.run
+          .withSuccessHandler(renderAppData)
+          .withFailureHandler(handleError)
+          .getAppData();
+      }
+
+      function renderAppData(data) {
+        state.data = data;
+        document.getElementById('currentCapital').textContent = currency.format(
+          data.metrics.currentCapital
+        );
+        document.getElementById('targetCapital').textContent = currency.format(
+          data.metrics.targetCapital
+        );
+        document.getElementById('dailyLimit').textContent = currency.format(data.metrics.dailyLimit);
+        document.getElementById('daysRemaining').textContent = data.metrics.daysRemaining;
+        renderTransactions(data.transactions);
+        renderBudget(data.budget);
+        renderReports(data.reports);
+        renderCapitalChart(data.metrics.balanceSeries);
+        renderBudgetChart(data.budget);
+      }
+
+      function renderTransactions(transactions) {
+        const table = document.getElementById('transactionsTable');
+        table.innerHTML = '';
+        const rows = transactions.slice(-8).reverse();
+        if (!rows.length) {
+          table.innerHTML =
+            '<tr><td class="py-3 text-slate-400" colspan="5">No flows logged yet.</td></tr>';
+          return;
+        }
+        rows.forEach((txn) => {
+          const statusClass =
+            txn.status && txn.status.startsWith('REJECTED') ? 'text-rose-400' : 'text-emerald-400';
+          table.insertAdjacentHTML(
+            'beforeend',
+            `<tr class="border-t border-white/5">
+              <td class="py-2">${txn.date}</td>
+              <td class="py-2">${txn.type}</td>
+              <td class="py-2">${currency.format(txn.amount)}</td>
+              <td class="py-2">${txn.note || ''}</td>
+              <td class="py-2 ${statusClass}">${txn.status}</td>
+            </tr>`
+          );
+        });
+      }
+
+      function renderBudget(budget) {
+        const table = document.getElementById('budgetTable');
+        table.innerHTML = '';
+        if (!budget.length) {
+          table.innerHTML =
+            '<tr><td class="py-3 text-slate-400" colspan="3">No budget entries yet.</td></tr>';
+          return;
+        }
+        budget.forEach((row) => {
+          table.insertAdjacentHTML(
+            'beforeend',
+            `<tr class="border-t border-white/5">
+              <td class="py-2">${row.category}</td>
+              <td class="py-2">${currency.format(row.planned)}</td>
+              <td class="py-2">${currency.format(row.actual)}</td>
+            </tr>`
+          );
+        });
+      }
+
+      function renderReports(reports) {
+        const list = document.getElementById('reportList');
+        list.innerHTML = '';
+        if (!reports.length) {
+          list.innerHTML =
+            '<p class="text-sm text-slate-400">No directives stored yet.</p>';
+          return;
+        }
+        reports
+          .slice()
+          .reverse()
+          .slice(0, 5)
+          .forEach((report) => {
+            list.insertAdjacentHTML(
+              'beforeend',
+              `<div class="rounded-2xl border border-white/10 bg-slate-900/60 p-3">
+                <p class="text-xs text-slate-400">${report.date}</p>
+                <p class="mt-2 text-sm text-slate-100">${report.synthesis}</p>
+              </div>`
+            );
+          });
+      }
+
+      function renderCapitalChart(series) {
+        const ctx = document.getElementById('capitalChart');
+        const labels = series.map((point) => point.date);
+        const data = series.map((point) => point.balance);
+        if (state.charts.capital) {
+          state.charts.capital.data.labels = labels;
+          state.charts.capital.data.datasets[0].data = data;
+          state.charts.capital.update();
+          return;
+        }
+        state.charts.capital = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Capital',
+                data,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.25)',
+                tension: 0.35,
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+            },
+            scales: {
+              x: {
+                ticks: { color: '#94a3b8' },
+                grid: { color: 'rgba(148, 163, 184, 0.1)' },
+              },
+              y: {
+                ticks: {
+                  color: '#94a3b8',
+                  callback: (value) => currency.format(value),
+                },
+                grid: { color: 'rgba(148, 163, 184, 0.1)' },
+              },
+            },
+          },
+        });
+      }
+
+      function renderBudgetChart(budget) {
+        const ctx = document.getElementById('budgetChart');
+        const labels = budget.map((row) => row.category);
+        const data = budget.map((row) => row.planned);
+        if (state.charts.budget) {
+          state.charts.budget.data.labels = labels;
+          state.charts.budget.data.datasets[0].data = data;
+          state.charts.budget.update();
+          return;
+        }
+        state.charts.budget = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels,
+            datasets: [
+              {
+                data,
+                backgroundColor: ['#3b82f6', '#9333ea', '#06b6d4', '#f59e0b', '#10b981'],
+                borderWidth: 0,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: '#cbd5f5', boxWidth: 12 },
+              },
+            },
+          },
+        });
+      }
+
+      function runDebate() {
+        const input = document.getElementById('debateInput').value.trim();
+        if (!input) {
+          return;
+        }
+        document.getElementById('debateStatus').textContent = 'Running debate engine...';
+        google.script.run
+          .withSuccessHandler(renderDebate)
+          .withFailureHandler(handleError)
+          .processChatMessage(input);
+      }
+
+      function renderDebate(result) {
+        if (result.error) {
+          document.getElementById('debateStatus').textContent = result.error;
+          return;
+        }
+        document.getElementById('debateStatus').textContent = 'Debate complete.';
+        document.getElementById('proposerOutput').textContent = result.proposer || '';
+        document.getElementById('criticOutput').textContent = result.critic || '';
+        document.getElementById('synthOutput').textContent = result.synthesis || '';
+        loadData();
+      }
+
+      function openFlowModal() {
+        const today = new Date().toISOString().slice(0, 10);
+        document.getElementById('flowDate').value = today;
+        document.getElementById('flowModal').classList.remove('hidden');
+      }
+
+      function closeFlowModal() {
+        document.getElementById('flowModal').classList.add('hidden');
+      }
+
+      function openGoalModal() {
+        document.getElementById('goalModal').classList.remove('hidden');
+      }
+
+      function closeGoalModal() {
+        document.getElementById('goalModal').classList.add('hidden');
+      }
+
+      function handleError(error) {
+        const message = error && error.message ? error.message : String(error);
+        document.getElementById('debateStatus').textContent = message;
+      }
+    </script>
+  </body>
+</html>
