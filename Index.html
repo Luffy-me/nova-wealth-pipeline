@@ -37,6 +37,9 @@
               Systematic execution based on probability and data. Expected value overrides
               emotion.
             </p>
+            <p class="mt-3 text-sm text-slate-300">
+              Active Goal: <span id="goalStatement" class="text-slate-100"></span>
+            </p>
           </div>
           <div class="flex flex-wrap gap-3">
             <button
@@ -225,6 +228,12 @@
         <form id="goalForm" class="mt-4 space-y-3">
           <input type="number" id="goalTarget" class="input" placeholder="Target Capital" />
           <input type="number" id="goalDays" class="input" placeholder="Days Remaining" />
+          <textarea
+            id="goalStatementInput"
+            rows="4"
+            class="input"
+            placeholder="Goal statement"
+          ></textarea>
           <div class="flex justify-end gap-2">
             <button type="button" class="button-secondary" onclick="closeGoalModal()">
               Cancel
@@ -369,10 +378,32 @@
           event.preventDefault();
           const target = document.getElementById('goalTarget').value;
           const days = document.getElementById('goalDays').value;
+          const goalStatement = document.getElementById('goalStatementInput').value;
+          const currentGoal =
+            state.data && state.data.settings ? state.data.settings.GoalStatement || '' : '';
+          const shouldResearch = `${goalStatement}${currentGoal}`.trim().length > 0;
+          if (shouldResearch) {
+            document.getElementById('debateStatus').textContent = 'Running goal research...';
+          }
           google.script.run
-            .withSuccessHandler(renderAppData)
+            .withSuccessHandler((result) => {
+              const data = result && result.data ? result.data : result;
+              if (data && data.metrics) {
+                renderAppData(data);
+              }
+              if (result && (result.research || result.error)) {
+                if (result.research) {
+                  renderDebate({
+                    ...result.research,
+                    status: result.status || 'Goal research complete.',
+                  });
+                } else {
+                  renderDebate({ error: result.error });
+                }
+              }
+            })
             .withFailureHandler(handleError)
-            .updateGoal(target, days);
+            .updateGoal(target, days, goalStatement);
           closeGoalModal();
         });
       }
@@ -386,6 +417,14 @@
 
       function renderAppData(data) {
         state.data = data;
+        const goalDisplay = document.getElementById('goalStatement');
+        if (goalDisplay) {
+          const goal =
+            data && data.settings && data.settings.GoalStatement
+              ? data.settings.GoalStatement
+              : 'Not set';
+          goalDisplay.textContent = goal || 'Not set';
+        }
         document.getElementById('currentCapital').textContent = currency.format(
           data.metrics.currentCapital
         );
@@ -569,7 +608,8 @@
           document.getElementById('debateStatus').textContent = result.error;
           return;
         }
-        document.getElementById('debateStatus').textContent = 'Debate complete.';
+        document.getElementById('debateStatus').textContent =
+          result.status || 'Debate complete.';
         document.getElementById('proposerOutput').textContent = result.proposer || '';
         document.getElementById('criticOutput').textContent = result.critic || '';
         document.getElementById('synthOutput').textContent = result.synthesis || '';
@@ -587,6 +627,14 @@
       }
 
       function openGoalModal() {
+        if (state.data && state.data.metrics) {
+          document.getElementById('goalTarget').value = state.data.metrics.targetCapital || '';
+          document.getElementById('goalDays').value = state.data.metrics.daysRemaining || '';
+        }
+        if (state.data && state.data.settings) {
+          document.getElementById('goalStatementInput').value =
+            state.data.settings.GoalStatement || '';
+        }
         document.getElementById('goalModal').classList.remove('hidden');
       }
 

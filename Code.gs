@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   TargetCapital: 1000000,
   CurrentCapital: 250000,
   DaysRemaining: 180,
+  GoalStatement: '',
 };
 
 function doGet() {
@@ -69,7 +70,7 @@ function logFlow(payload) {
   return getAppData();
 }
 
-function updateGoal(targetCapital, daysRemaining) {
+function updateGoal(targetCapital, daysRemaining, goalStatement) {
   const sheets = ensureSheets_();
   if (targetCapital !== undefined && targetCapital !== null && targetCapital !== '') {
     setSetting_(sheets.settings, 'TargetCapital', toNumber_(targetCapital));
@@ -77,7 +78,23 @@ function updateGoal(targetCapital, daysRemaining) {
   if (daysRemaining !== undefined && daysRemaining !== null && daysRemaining !== '') {
     setSetting_(sheets.settings, 'DaysRemaining', Math.max(0, toNumber_(daysRemaining)));
   }
-  return getAppData();
+  if (goalStatement !== undefined && goalStatement !== null) {
+    setSetting_(sheets.settings, 'GoalStatement', String(goalStatement).trim());
+  }
+
+  const data = getAppData();
+  const goal = (data.settings.GoalStatement || '').trim();
+  if (!goal) {
+    return { data };
+  }
+
+  try {
+    const research = runGoalResearch_(data, goal);
+    sheets.reports.appendRow([new Date(), research.proposer, research.critic, research.synthesis]);
+    return { data: getAppData(), research, status: 'Goal research complete.' };
+  } catch (error) {
+    return { data, error: error.message || 'Goal research failed.' };
+  }
 }
 
 function processChatMessage(message) {
@@ -249,12 +266,18 @@ function normalizeAmount_(amount, type) {
 
 function buildContext_(data) {
   const metrics = data.metrics;
+  const goalStatement = data.settings && data.settings.GoalStatement
+    ? String(data.settings.GoalStatement).trim()
+    : '';
   const summaryLines = [
     `TargetCapital: ${metrics.targetCapital}`,
     `CurrentCapital: ${metrics.currentCapital}`,
     `DaysRemaining: ${metrics.daysRemaining}`,
     `DailySafetyLimit: ${metrics.dailyLimit}`,
   ];
+  if (goalStatement) {
+    summaryLines.push(`GoalStatement: ${goalStatement}`);
+  }
   const recent = data.transactions.slice(-8);
   const recentLines = recent.map(
     (txn) => `${txn.date} | ${txn.type} | ${txn.amount} | ${txn.status}`
@@ -293,6 +316,57 @@ UserPrompt:\n${message}
 ProposerOutput:\n${proposer}
 CriticOutput:\n${critic}
 Output format: Final directive, Risk controls, Monitoring triggers.`;
+}
+
+function buildGoalResearchProposerPrompt_(context, goalStatement) {
+  return `${basePersona_()}
+Role: Deep Research Lead.
+Objective: Conduct deep research on the goal and draft a step-by-step pipeline to reach it.
+Constraints: Evidence-first, quantify assumptions, no emojis, prioritize expected value.
+Context:\n${context}
+Goal:\n${goalStatement}
+Output format: Research Summary (3-5 bullets), Pipeline (5-9 numbered steps), Success Metrics (3-5 bullets).`;
+}
+
+function buildGoalResearchCriticPrompt_(context, goalStatement, proposer) {
+  return `${basePersona_()}
+Role: Critical Analyst.
+Objective: Stress-test the pipeline for feasibility, hidden dependencies, timing, and variance.
+Constraints: Cold, probabilistic, no emojis, prioritize expected value.
+Context:\n${context}
+Goal:\n${goalStatement}
+ProposerOutput:\n${proposer}
+Output format: 3-6 bullet critiques and required pipeline adjustments.`;
+}
+
+function buildGoalResearchSynthPrompt_(context, goalStatement, proposer, critic) {
+  return `${basePersona_()}
+Role: Pipeline Architect.
+Objective: Produce the final, actionable pipeline to reach the goal.
+Constraints: No emojis. Emphasize expected value, risk controls, and monitoring triggers.
+Context:\n${context}
+Goal:\n${goalStatement}
+ProposerOutput:\n${proposer}
+CriticOutput:\n${critic}
+Output format: Final Pipeline (numbered), Risk Controls, Monitoring Triggers.`;
+}
+
+function runGoalResearch_(data, goalStatement) {
+  const context = buildContext_(data);
+  const proposerPrompt = buildGoalResearchProposerPrompt_(context, goalStatement);
+  const proposer = callGemini_(proposerPrompt);
+
+  const criticPrompt = buildGoalResearchCriticPrompt_(context, goalStatement, proposer);
+  const critic = callGroq_(criticPrompt);
+
+  const synthPrompt = buildGoalResearchSynthPrompt_(context, goalStatement, proposer, critic);
+  const synthesis = callGemini_(synthPrompt);
+
+  return {
+    proposer,
+    critic,
+    synthesis,
+  };
 }
 
 function basePersona_() {
