@@ -40,14 +40,14 @@
           </div>
           <div class="flex flex-wrap gap-3">
             <button
+              id="openGoalButton"
               class="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-medium backdrop-blur"
-              onclick="openGoalModal()"
             >
               Change Goal
             </button>
             <button
+              id="openFlowButton"
               class="rounded-full bg-blue-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30"
-              onclick="openFlowModal()"
             >
               + Log Flow
             </button>
@@ -162,8 +162,8 @@
                       placeholder="Insert your tactical question or macro thesis."
                     ></textarea>
                     <button
+                      id="runDebateButton"
                       class="rounded-full bg-blue-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30"
-                      onclick="runDebate()"
                     >
                       Run Debate
                     </button>
@@ -210,7 +210,7 @@
           <input type="number" id="flowAmount" class="input" placeholder="Amount" step="0.01" />
           <input type="text" id="flowNote" class="input" placeholder="Note" />
           <div class="flex justify-end gap-2">
-            <button type="button" class="button-secondary" onclick="closeFlowModal()">
+            <button id="closeFlowButton" type="button" class="button-secondary">
               Cancel
             </button>
             <button type="submit" class="button-primary">Submit</button>
@@ -226,7 +226,7 @@
           <input type="number" id="goalTarget" class="input" placeholder="Target Capital" />
           <input type="number" id="goalDays" class="input" placeholder="Days Remaining" />
           <div class="flex justify-end gap-2">
-            <button type="button" class="button-secondary" onclick="closeGoalModal()">
+            <button id="closeGoalButton" type="button" class="button-secondary">
               Cancel
             </button>
             <button type="submit" class="button-primary">Update</button>
@@ -330,6 +330,7 @@
       document.addEventListener('DOMContentLoaded', () => {
         setupTabs();
         setupForms();
+        setupButtons();
         loadData();
       });
 
@@ -375,6 +376,29 @@
             .updateGoal(target, days);
           closeGoalModal();
         });
+      }
+
+      function setupButtons() {
+        const openGoalButton = document.getElementById('openGoalButton');
+        if (openGoalButton) {
+          openGoalButton.addEventListener('click', openGoalModal);
+        }
+        const openFlowButton = document.getElementById('openFlowButton');
+        if (openFlowButton) {
+          openFlowButton.addEventListener('click', openFlowModal);
+        }
+        const runDebateButton = document.getElementById('runDebateButton');
+        if (runDebateButton) {
+          runDebateButton.addEventListener('click', runDebate);
+        }
+        const closeFlowButton = document.getElementById('closeFlowButton');
+        if (closeFlowButton) {
+          closeFlowButton.addEventListener('click', closeFlowModal);
+        }
+        const closeGoalButton = document.getElementById('closeGoalButton');
+        if (closeGoalButton) {
+          closeGoalButton.addEventListener('click', closeGoalModal);
+        }
       }
 
       function loadData() {
